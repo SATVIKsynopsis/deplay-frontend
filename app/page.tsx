@@ -1,65 +1,216 @@
-import Image from "next/image";
+"use client";
+
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { AlertCircle, CheckCircle2, GitBranch, Zap, Code2, Terminal } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export default function Home() {
+  const [repoUrl, setRepoUrl] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState<any>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const runSandbox = async () => {
+    setLoading(true);
+    setError(null);
+    setResult(null);
+
+    try {
+      const res = await fetch("/api/run", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ repoUrl }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.error || "Something went wrong");
+      } else {
+        setResult(data);
+      }
+    } catch (err) {
+      setError("Failed to reach backend");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+    <main className="min-h-screen bg-gradient-to-br from-background via-background to-card/40">
+      {/* Background Grid Effect */}
+      <div className="fixed inset-0 -z-10 overflow-hidden">
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,hsl(var(--border))_1px,transparent_1px),linear-gradient(to_bottom,hsl(var(--border))_1px,transparent_1px)] bg-[size:2rem_2rem] opacity-5" />
+      </div>
+
+      <div className="relative mx-auto max-w-3xl px-4 py-12 sm:px-6 lg:px-8">
+        {/* Header Section */}
+        <div className="mb-12 space-y-2 text-center">
+          <div className="flex items-center justify-center gap-2 mb-4">
+            <div className="p-2 rounded-lg bg-gradient-to-br from-primary/20 to-secondary/20 border border-primary/30">
+              <Zap className="h-6 w-6 text-primary" />
+            </div>
+            <h1 className="text-4xl sm:text-5xl font-bold bg-gradient-to-r from-foreground via-primary to-secondary bg-clip-text text-transparent">
+              Deplik
+            </h1>
+          </div>
+          <p className="text-lg text-muted-foreground max-w-xl mx-auto">
+            Pre-Deployment Sandbox – Test your repository before it goes live
+          </p>
+          <p className="text-sm text-muted-foreground/70">
+            Analyze code quality, detect issues, and get AI-powered suggestions
           </p>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+
+        {/* Input Card */}
+        <Card className="mb-8 border-primary/20 bg-card/50 backdrop-blur-sm">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <GitBranch className="h-5 w-5 text-primary" />
+              Repository URL
+            </CardTitle>
+            <CardDescription>
+              Enter your GitHub repository URL to analyze
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex gap-3">
+              <Input
+                type="text"
+                placeholder="https://github.com/user/repo"
+                value={repoUrl}
+                onChange={(e) => setRepoUrl(e.target.value)}
+                className="flex-1 bg-input border-border/50 focus:border-primary focus:ring-primary/30"
+              />
+              <Button
+                onClick={runSandbox}
+                disabled={loading || !repoUrl}
+                className="px-8 bg-gradient-to-r from-primary to-secondary hover:from-primary/90 hover:to-secondary/90 transition-all duration-200"
+              >
+                {loading ? (
+                  <span className="flex items-center gap-2">
+                    <div className="h-4 w-4 rounded-full border-2 border-current border-r-transparent animate-spin" />
+                    Running...
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-2">
+                    <Zap className="h-4 w-4" />
+                    Run Sandbox
+                  </span>
+                )}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Error State */}
+        {error && (
+          <Alert className="mb-8 border-destructive/50 bg-destructive/5">
+            <AlertCircle className="h-4 w-4 text-destructive" />
+            <AlertDescription className="text-destructive">
+              {error}
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {/* Results Section */}
+        {result && (
+          <div className="space-y-6">
+            {/* Status Card */}
+            <Card className="border-primary/20 bg-card/50 backdrop-blur-sm">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center gap-2">
+                    <CheckCircle2 className="h-5 w-5 text-accent" />
+                    Sandbox Status
+                  </CardTitle>
+                  <Badge
+                    variant={result.status === "success" ? "default" : "secondary"}
+                    className="capitalize"
+                  >
+                    {result.status}
+                  </Badge>
+                </div>
+              </CardHeader>
+            </Card>
+
+            {/* AI Summary Card */}
+            <Card className="border-secondary/20 bg-card/50 backdrop-blur-sm">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Code2 className="h-5 w-5 text-secondary" />
+                  AI Summary
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-muted-foreground leading-relaxed">
+                  {result.analysis.summary}
+                </p>
+              </CardContent>
+            </Card>
+
+            {/* Suggestions Card */}
+            <Card className="border-primary/20 bg-card/50 backdrop-blur-sm">
+              <CardHeader>
+                <CardTitle className="text-lg">Suggested Fixes</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ul className="space-y-3">
+                  {result.analysis.suggestions.map((suggestion: string, i: number) => (
+                    <li
+                      key={i}
+                      className="flex items-start gap-3 p-3 rounded-lg bg-muted/30 border border-border/50 hover:border-primary/30 transition-colors"
+                    >
+                      <div className="mt-1 h-2 w-2 rounded-full bg-primary flex-shrink-0" />
+                      <span className="text-sm text-foreground/90">{suggestion}</span>
+                    </li>
+                  ))}
+                </ul>
+              </CardContent>
+            </Card>
+
+            {/* Logs Card */}
+            <Card className="border-muted/20 bg-card/50 backdrop-blur-sm overflow-hidden">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Terminal className="h-5 w-5 text-muted-foreground" />
+                  Logs
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <pre className="bg-background/80 border border-border rounded-lg p-4 overflow-auto max-h-64 text-xs font-mono text-primary/80 whitespace-pre-wrap break-words">
+                  {result.logs}
+                </pre>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* Empty State */}
+        {!result && !loading && !error && (
+          <Card className="border-border/50 bg-card/30 backdrop-blur-sm text-center py-12">
+            <CardContent className="space-y-4">
+              <div className="flex justify-center">
+                <div className="p-4 rounded-lg bg-gradient-to-br from-primary/10 to-secondary/10 border border-primary/20">
+                  <GitBranch className="h-8 w-8 text-primary/60" />
+                </div>
+              </div>
+              <div>
+                <p className="text-lg font-medium text-foreground/80">
+                  Ready to analyze your repository
+                </p>
+                <p className="text-sm text-muted-foreground mt-2">
+                  Enter a GitHub repository URL and click Run Sandbox to get started
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+    </main>
   );
 }
