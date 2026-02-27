@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,34 +11,73 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 export default function Home() {
   const [repoUrl, setRepoUrl] = useState("");
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<any>(null);
+  const [runId, setRunId] = useState<string | null>(null);
+  const [logs, setLogs] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [analysis, setAnalysis] = useState<{
+  summary: string;
+  suggestions: string[];
+} | null>(null);
+const [status, setStatus] = useState<
+  "RUNNING" | "READY" | "NOT_READY"
+>("RUNNING");
 
   const runSandbox = async () => {
-    setLoading(true);
-    setError(null);
-    setResult(null);
+  setLoading(true);
+  setError(null);
+  setLogs("");
+  setRunId(null);
 
-    try {
-      const res = await fetch("/api/run", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ repoUrl }),
-      });
+  try {
+    const res = await fetch("/api/run", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ repoUrl }),
+    });
 
-      const data = await res.json();
+    const data = await res.json();
 
-      if (!res.ok) {
-        setError(data.error || "Something went wrong");
-      } else {
-        setResult(data);
-      }
-    } catch (err) {
-      setError("Failed to reach backend");
-    } finally {
+    if (!res.ok) {
+      setError(data.error || "Something went wrong");
       setLoading(false);
+      return;
     }
-  };
+
+    setRunId(data.runId);
+
+    const es = new EventSource(`/api/logs/${data.runId}`);
+
+    es.onmessage = (event) => {
+      setLogs((prev) => prev + event.data);
+    };
+
+    es.onerror = () => {
+      es.close();
+      setLoading(false);
+    };
+  } catch (err) {
+    setError("Failed to reach backend");
+    setLoading(false);
+  }
+};
+
+useEffect(() => {
+  if (!logs) return;
+
+  setStatus("RUNNING");
+
+  if (
+    logs.includes("error") ||
+    logs.includes("Error") ||
+    logs.includes("failed")
+  ) {
+    setStatus("NOT_READY");
+  }
+
+  if (logs.includes("Docker build finished")) {
+    setStatus("READY");
+  }
+}, [logs]);
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-background via-background to-card/40">
@@ -118,7 +157,7 @@ export default function Home() {
         )}
 
         {/* Results Section */}
-        {result && (
+        {runId && (
           <div className="space-y-6">
             {/* Status Card */}
             <Card className="border-primary/20 bg-card/50 backdrop-blur-sm">
@@ -129,10 +168,10 @@ export default function Home() {
                     Sandbox Status
                   </CardTitle>
                   <Badge
-                    variant={result.status === "success" ? "default" : "secondary"}
+                    variant={status === "READY" ? "default" : "secondary"}
                     className="capitalize"
                   >
-                    {result.status}
+                    {status}
                   </Badge>
                 </div>
               </CardHeader>
@@ -148,7 +187,7 @@ export default function Home() {
               </CardHeader>
               <CardContent>
                 <p className="text-muted-foreground leading-relaxed">
-                  {result.analysis.summary}
+                  {analysis?.summary || "The AI summary will appear here once the analysis is complete."}
                 </p>
               </CardContent>
             </Card>
@@ -158,19 +197,25 @@ export default function Home() {
               <CardHeader>
                 <CardTitle className="text-lg">Suggested Fixes</CardTitle>
               </CardHeader>
-              <CardContent>
-                <ul className="space-y-3">
-                  {result.analysis.suggestions.map((suggestion: string, i: number) => (
-                    <li
-                      key={i}
-                      className="flex items-start gap-3 p-3 rounded-lg bg-muted/30 border border-border/50 hover:border-primary/30 transition-colors"
-                    >
-                      <div className="mt-1 h-2 w-2 rounded-full bg-primary flex-shrink-0" />
-                      <span className="text-sm text-foreground/90">{suggestion}</span>
-                    </li>
-                  ))}
-                </ul>
-              </CardContent>
+             <CardContent>
+  <ul className="space-y-3">
+    {analysis ? (
+      analysis.suggestions.map((suggestion, i) => (
+        <li
+          key={i}
+          className="flex items-start gap-3 p-3 rounded-lg bg-muted/30"
+        >
+          <div className="mt-1 h-2 w-2 rounded-full bg-primary" />
+          <span className="text-sm">{suggestion}</span>
+        </li>
+      ))
+    ) : (
+      <p className="text-sm text-muted-foreground">
+        Suggestions will appear once analysis completes
+      </p>
+    )}
+  </ul>
+</CardContent>
             </Card>
 
             {/* Logs Card */}
@@ -183,15 +228,14 @@ export default function Home() {
               </CardHeader>
               <CardContent>
                 <pre className="bg-background/80 border border-border rounded-lg p-4 overflow-auto max-h-64 text-xs font-mono text-primary/80 whitespace-pre-wrap break-words">
-                  {result.logs}
-                </pre>
+{logs || "Waiting for logs..."}                </pre>
               </CardContent>
             </Card>
           </div>
         )}
 
         {/* Empty State */}
-        {!result && !loading && !error && (
+        {!runId && !loading && !error && (
           <Card className="border-border/50 bg-card/30 backdrop-blur-sm text-center py-12">
             <CardContent className="space-y-4">
               <div className="flex justify-center">
