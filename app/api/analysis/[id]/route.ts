@@ -9,21 +9,22 @@ export async function GET(
   const { id } = await params;
 
   const backendRes = await fetch(
-    `http://3.111.147.73:8080/logs/${id}`,
+    `http://3.111.147.73:8080/analysis/${id}`,
     {
-      headers: {
-        Accept: "text/event-stream",
-      },
       cache: "no-store",
     }
   );
 
-  return new Response(backendRes.body, {
-    status: backendRes.status,
+  if (!backendRes.ok) {
+    return new Response("Analysis not ready", {
+      status: backendRes.status,
+    });
+  }
+
+  return new Response(await backendRes.text(), {
     headers: {
-      "Content-Type": "text/event-stream",
-      "Cache-Control": "no-cache, no-transform",
-      Connection: "keep-alive",
+      "Content-Type": "application/json",
+      "Cache-Control": "no-store",
     },
   });
 }
