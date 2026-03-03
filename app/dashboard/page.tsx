@@ -88,7 +88,7 @@ const fetchRepos = async () => {
   setReposLoading(true);
   setReposError(null);
   try {
-    const res = await fetch("http://3.111.147.73:8080/repos", {
+    const res = await fetch("/api/repos", {
       credentials: "include",
     });
     if (!res.ok) {
