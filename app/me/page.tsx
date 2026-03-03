@@ -71,7 +71,7 @@ export default function ProfilePage() {
   useEffect(() => {
     const fetchUser = async () => {
       try {
-        const res = await fetch("/api/me", {
+        const res = await fetch("http://3.111.147.73:8080/me", {
           credentials: "include",
         });
 
