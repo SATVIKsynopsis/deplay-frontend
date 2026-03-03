@@ -151,7 +151,7 @@ const handleRepoSelect = (repoFullName: string) => {
   setAnalysisLoading(false);
 
   try {
-    const res = await fetch("http://3.111.147.73:8080/run", {
+    const res = await fetch("/api/run", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ repoUrl, language }),
