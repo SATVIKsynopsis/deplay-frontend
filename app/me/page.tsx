@@ -19,6 +19,7 @@ import {
   Hash,
 } from "lucide-react";
 import Link from "next/link";
+import { RunsSection } from "@/components/ui/runs-card";
 
 interface User {
   avatarUrl: string;
@@ -305,6 +306,9 @@ export default function ProfilePage() {
                 </div>
               </CardContent>
             </Card>
+
+            {/* Analysis Runs */}
+            <RunsSection />
           </div>
         ) : null}
       </main>
