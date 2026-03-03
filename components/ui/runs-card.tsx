@@ -6,6 +6,15 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import {
   CheckCircle2,
   AlertCircle,
@@ -13,8 +22,12 @@ import {
   Zap,
   Github,
   FileText,
-  Download,
+  Sparkles,
   ExternalLink,
+  Terminal,
+  Lightbulb,
+  AlertTriangle,
+  Loader2,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -23,14 +36,21 @@ interface Run {
   repoName: string;
   repoUrl: string;
   language: string;
-  status: "RUNNING" | "READY" | "NOT_READY" | "FAILED";
+  status: "RUNNING" | "READY" | "NOT_READY" | "FAILED" | "SUCCESS";
   createdAt: string;
   logsS3Key: string;
   analysisS3Key: string;
 }
 
+interface Analysis {
+  issues: string[];
+  suggestions: string[];
+  summary: string;
+}
+
 const statusConfig = {
   READY: { color: "bg-green-500/10 text-green-700 dark:text-green-400", icon: CheckCircle2, label: "Ready" },
+  SUCCESS: { color: "bg-green-500/10 text-green-700 dark:text-green-400", icon: CheckCircle2, label: "Success" },
   RUNNING: { color: "bg-blue-500/10 text-blue-700 dark:text-blue-400", icon: Clock, label: "Running" },
   NOT_READY: { color: "bg-yellow-500/10 text-yellow-700 dark:text-yellow-400", icon: AlertCircle, label: "Not Ready" },
   FAILED: { color: "bg-red-500/10 text-red-700 dark:text-red-400", icon: AlertCircle, label: "Failed" },
@@ -46,6 +66,222 @@ const languageColors: Record<string, string> = {
   go: "bg-cyan-100 text-cyan-800 dark:bg-cyan-900/30 dark:text-cyan-300",
   default: "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300",
 };
+
+// Logs Dialog Component
+function LogsDialog({ runId, repoName }: { runId: string; repoName: string }) {
+  const [logs, setLogs] = useState<string>("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [open, setOpen] = useState(false);
+
+  const fetchLogs = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await fetch(`/api/logs/${runId}`);
+      if (!response.ok) throw new Error("Failed to fetch logs");
+      const text = await response.text();
+      setLogs(text);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load logs");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (open) {
+      fetchLogs();
+    }
+  }, [open, runId]);
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button variant="ghost" size="sm" className="h-8 gap-2">
+          <Terminal className="h-4 w-4" />
+          <span>Logs</span>
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-4xl max-h-[80vh] flex flex-col">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Terminal className="h-5 w-5 text-primary" />
+            Build Logs
+          </DialogTitle>
+          <DialogDescription>
+            Logs for {repoName} • Run ID: {runId.substring(0, 8)}...
+          </DialogDescription>
+        </DialogHeader>
+        
+        <div className="flex-1 min-h-0 mt-4">
+          {loading ? (
+            <div className="flex items-center justify-center h-64">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+          ) : error ? (
+            <div className="flex flex-col items-center justify-center h-64 text-destructive">
+              <AlertCircle className="h-8 w-8 mb-2" />
+              <p>{error}</p>
+            </div>
+          ) : (
+            <ScrollArea className="h-[50vh] rounded-lg border border-border/50 bg-black/90">
+              <pre className="p-4 text-sm font-mono text-green-400 whitespace-pre-wrap break-words">
+                {logs || "No logs available"}
+              </pre>
+            </ScrollArea>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// Analysis Dialog Component
+function AnalysisDialog({ runId, repoName }: { runId: string; repoName: string }) {
+  const [analysis, setAnalysis] = useState<Analysis | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [open, setOpen] = useState(false);
+
+  const fetchAnalysis = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await fetch(`/api/analysis/${runId}`);
+      if (!response.ok) throw new Error("Failed to fetch analysis");
+      const data = await response.json();
+      setAnalysis(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load analysis");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (open) {
+      fetchAnalysis();
+    }
+  }, [open, runId]);
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button variant="ghost" size="sm" className="h-8 gap-2">
+          <Sparkles className="h-4 w-4" />
+          <span>Analysis</span>
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-4xl max-h-[85vh] flex flex-col">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Sparkles className="h-5 w-5 text-primary" />
+            AI Analysis Report
+          </DialogTitle>
+          <DialogDescription>
+            Analysis for {repoName} • Run ID: {runId.substring(0, 8)}...
+          </DialogDescription>
+        </DialogHeader>
+        
+        <div className="flex-1 min-h-0 mt-4 overflow-hidden">
+          {loading ? (
+            <div className="flex items-center justify-center h-64">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+          ) : error ? (
+            <div className="flex flex-col items-center justify-center h-64 text-destructive">
+              <AlertCircle className="h-8 w-8 mb-2" />
+              <p>{error}</p>
+            </div>
+          ) : analysis ? (
+            <ScrollArea className="h-[60vh] pr-4">
+              <div className="space-y-6">
+                {/* Summary Section */}
+                <Card className="border-primary/20 bg-primary/5">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <FileText className="h-4 w-4 text-primary" />
+                      Summary
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm text-muted-foreground leading-relaxed">
+                      {analysis.summary}
+                    </p>
+                  </CardContent>
+                </Card>
+
+                {/* Issues Section */}
+                {analysis.issues && analysis.issues.length > 0 && (
+                  <Card className="border-yellow-500/20 bg-yellow-500/5">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <AlertTriangle className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
+                        Issues Found
+                        <Badge variant="secondary" className="ml-2 bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300">
+                          {analysis.issues.length}
+                        </Badge>
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <ul className="space-y-3">
+                        {analysis.issues.map((issue, index) => (
+                          <li key={index} className="flex gap-3 text-sm">
+                            <span className="flex-shrink-0 w-6 h-6 rounded-full bg-yellow-500/20 text-yellow-700 dark:text-yellow-400 flex items-center justify-center text-xs font-medium">
+                              {index + 1}
+                            </span>
+                            <span className="text-muted-foreground leading-relaxed pt-0.5">
+                              {issue}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Suggestions Section */}
+                {analysis.suggestions && analysis.suggestions.length > 0 && (
+                  <Card className="border-green-500/20 bg-green-500/5">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <Lightbulb className="h-4 w-4 text-green-600 dark:text-green-400" />
+                        Suggestions
+                        <Badge variant="secondary" className="ml-2 bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300">
+                          {analysis.suggestions.length}
+                        </Badge>
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <ul className="space-y-3">
+                        {analysis.suggestions.map((suggestion, index) => (
+                          <li key={index} className="flex gap-3 text-sm">
+                            <span className="flex-shrink-0 w-6 h-6 rounded-full bg-green-500/20 text-green-700 dark:text-green-400 flex items-center justify-center text-xs font-medium">
+                              {index + 1}
+                            </span>
+                            <span className="text-muted-foreground leading-relaxed pt-0.5">
+                              {suggestion}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
+            </ScrollArea>
+          ) : (
+            <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
+              <Sparkles className="h-8 w-8 mb-2 opacity-50" />
+              <p>No analysis available</p>
+            </div>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 function RunSkeleton() {
   return (
@@ -124,30 +360,10 @@ function RunCard({ run }: { run: Run }) {
 
         <div className="flex gap-2 pt-2">
           {run.logsS3Key && (
-            <Button
-              asChild
-              variant="ghost"
-              size="sm"
-              className="h-8 gap-2"
-            >
-              <Link href={`/api/logs/${run.runId}`}>
-                <FileText className="h-4 w-4" />
-                <span>Logs</span>
-              </Link>
-            </Button>
+            <LogsDialog runId={run.runId} repoName={run.repoName} />
           )}
           {run.analysisS3Key && (
-            <Button
-              asChild
-              variant="ghost"
-              size="sm"
-              className="h-8 gap-2"
-            >
-              <Link href={`/api/analysis/${run.runId}`}>
-                <Download className="h-4 w-4" />
-                <span>Analysis</span>
-              </Link>
-            </Button>
+            <AnalysisDialog runId={run.runId} repoName={run.repoName} />
           )}
           <Button
             asChild
