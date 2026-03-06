@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { AlertCircle, CheckCircle2, GitBranch, Zap, Code2, Terminal, Sparkles, ListChecks, User, Link as LinkIcon } from "lucide-react";
+import { AlertCircle, CheckCircle2, GitBranch, Zap, Code2, Terminal, Sparkles, ListChecks, User, Link as LinkIcon, Download, Clock, Circle, Loader2, Shield, ShieldAlert, ShieldX, Rocket, FileCode } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Spinner } from "@/components/ui/spinner";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -40,7 +40,9 @@ const [status, setStatus] = useState<
 >("RUNNING");
 const [analysisLoading, setAnalysisLoading] = useState(false);
 const [analysisError, setAnalysisError] = useState<string | null>(null);
+const [elapsedTime, setElapsedTime] = useState(0);
 const eventSourceRef = useRef<EventSource | null>(null);
+const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 const logQueueRef = useRef<string[]>([]);
 const logTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 const logsContainerRef = useRef<HTMLPreElement | null>(null);
@@ -323,6 +325,133 @@ const shortenedRunId = runId
   : "-";
 const dockerBuildFailed = logs.toLowerCase().includes("docker build failed");
 
+// Timeline steps based on log events
+const timelineSteps = useMemo(() => {
+  const steps = [
+    { id: 1, label: "Repository cloned", patterns: ["cloning", "cloned", "clone"], completed: false, inProgress: false },
+    { id: 2, label: "Dockerfile generated", patterns: ["dockerfile", "generating dockerfile"], completed: false, inProgress: false },
+    { id: 3, label: "Dependencies installed", patterns: ["dependencies", "installing", "npm install", "pip install", "cargo build"], completed: false, inProgress: false },
+    { id: 4, label: "Docker build completed", patterns: ["docker build finished", "build complete", "image built"], completed: false, inProgress: false },
+    { id: 5, label: "AI analysis running", patterns: ["analysis", "analyzing", "ai"], completed: false, inProgress: false },
+  ];
+
+  const logsLower = logs.toLowerCase();
+  let lastCompletedIndex = -1;
+
+  steps.forEach((step, index) => {
+    const isMatched = step.patterns.some(p => logsLower.includes(p));
+    if (isMatched) {
+      step.completed = true;
+      lastCompletedIndex = index;
+    }
+  });
+
+  // Mark Docker build as completed if it finished
+  if (logsLower.includes("docker build finished")) {
+    steps[3].completed = true;
+    lastCompletedIndex = Math.max(lastCompletedIndex, 3);
+  }
+
+  // Mark AI analysis as in progress when build is done but analysis not yet complete
+  if (status === "READY" && analysisLoading) {
+    steps[4].inProgress = true;
+    steps[4].completed = false;
+  }
+
+  // Mark AI analysis as completed when we have analysis
+  if (analysis) {
+    steps[4].completed = true;
+  }
+
+  // Mark the next step as in progress if we're still loading
+  if (loading && lastCompletedIndex < steps.length - 1) {
+    const nextStep = steps[lastCompletedIndex + 1];
+    if (nextStep && !nextStep.completed) {
+      nextStep.inProgress = true;
+    }
+  }
+
+  return steps;
+}, [logs, loading, status, analysis, analysisLoading]);
+
+// Deployment status based on analysis
+const deploymentStatus = useMemo(() => {
+  if (dockerBuildFailed || status === "NOT_READY") {
+    return { status: "failed", label: "Build Failed", color: "bg-red-500/10 text-red-600 border-red-500/30", icon: ShieldX };
+  }
+  
+  if (analysis) {
+    const hasVulnerabilities = analysis.suggestions.some(s => 
+      s.toLowerCase().includes("vulnerab") || 
+      s.toLowerCase().includes("security") ||
+      s.toLowerCase().includes("critical")
+    );
+    const hasWarnings = analysis.suggestions.some(s =>
+      s.toLowerCase().includes("warning") ||
+      s.toLowerCase().includes("error") ||
+      s.toLowerCase().includes("failed")
+    );
+
+    if (hasVulnerabilities) {
+      return { status: "warning", label: "Needs Attention", color: "bg-amber-500/10 text-amber-600 border-amber-500/30", icon: ShieldAlert };
+    }
+    if (hasWarnings) {
+      return { status: "warning", label: "Needs Attention", color: "bg-amber-500/10 text-amber-600 border-amber-500/30", icon: ShieldAlert };
+    }
+    return { status: "ready", label: "Ready for Deployment", color: "bg-emerald-500/10 text-emerald-600 border-emerald-500/30", icon: Shield };
+  }
+
+  return null;
+}, [analysis, dockerBuildFailed, status]);
+
+// Download report function
+const downloadReport = () => {
+  if (!analysis || !runId) return;
+
+  const report = {
+    timestamp: new Date().toISOString(),
+    runId: runId,
+    repository: repoUrl,
+    language: language,
+    status: status,
+    deploymentStatus: deploymentStatus?.label || "Unknown",
+    summary: analysis.summary,
+    suggestions: analysis.suggestions,
+    totalSuggestions: analysis.suggestions.length,
+  };
+
+  const blob = new Blob([JSON.stringify(report, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `deplik-report-${shortenedRunId}-${new Date().toISOString().split("T")[0]}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+};
+
+// Timer effect for elapsed time
+useEffect(() => {
+  if (loading) {
+    setElapsedTime(0);
+    timerRef.current = setInterval(() => {
+      setElapsedTime(prev => prev + 1);
+    }, 1000);
+  } else {
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+  }
+
+  return () => {
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+    }
+  };
+}, [loading]);
+
   return (
     <main className="min-h-screen bg-gradient-to-br from-background via-background to-card/40">
       {/* Background Grid Effect */}
@@ -513,22 +642,94 @@ const dockerBuildFailed = logs.toLowerCase().includes("docker build failed");
         {(runId || loading) && (
           <div className="grid gap-6 lg:grid-cols-[minmax(0,1.45fr)_minmax(0,1fr)] lg:items-start">
             <div className="space-y-6">
-              {/* Status Card */}
+              {/* Status Card with Timeline */}
               <Card className="border-primary/20 bg-card/50 backdrop-blur-sm">
                 <CardHeader>
                   <div className="flex items-center justify-between">
                     <CardTitle className="flex items-center gap-2">
-                      <CheckCircle2 className="h-5 w-5 text-accent" />
-                      Sandbox Status
+                      <Rocket className="h-5 w-5 text-primary" />
+                      Sandbox Execution
                     </CardTitle>
-                    <Badge
-                      variant={status === "READY" ? "default" : "secondary"}
-                      className="capitalize"
-                    >
-                      {status}
-                    </Badge>
+                    <div className="flex items-center gap-2">
+                      {loading && (
+                        <Badge variant="outline" className="gap-1.5 font-mono text-xs">
+                          <Clock className="h-3 w-3" />
+                          {Math.floor(elapsedTime / 60)}:{String(elapsedTime % 60).padStart(2, "0")}
+                        </Badge>
+                      )}
+                      <Badge
+                        variant={status === "READY" ? "default" : "secondary"}
+                        className="capitalize"
+                      >
+                        {status}
+                      </Badge>
+                    </div>
                   </div>
                 </CardHeader>
+                <CardContent>
+                  {/* Loading Progress State */}
+                  {loading && (
+                    <div className="mb-4 p-4 rounded-lg bg-primary/5 border border-primary/20">
+                      <div className="flex items-center gap-3">
+                        <div className="relative">
+                          <div className="h-8 w-8 rounded-full border-2 border-primary/30 border-t-primary animate-spin" />
+                          <Zap className="h-3 w-3 text-primary absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-foreground">Running sandbox...</p>
+                          <p className="text-xs text-muted-foreground">This may take ~30 seconds</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Execution Timeline */}
+                  <div className="space-y-3">
+                    {timelineSteps.map((step, index) => (
+                      <div key={step.id} className="flex items-center gap-3">
+                        <div className="relative flex items-center justify-center">
+                          {step.completed ? (
+                            <div className="h-6 w-6 rounded-full bg-emerald-500/20 flex items-center justify-center">
+                              <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                            </div>
+                          ) : step.inProgress ? (
+                            <div className="h-6 w-6 rounded-full bg-primary/20 flex items-center justify-center">
+                              <Loader2 className="h-4 w-4 text-primary animate-spin" />
+                            </div>
+                          ) : (
+                            <div className="h-6 w-6 rounded-full bg-muted/50 border border-border flex items-center justify-center">
+                              <Circle className="h-3 w-3 text-muted-foreground/50" />
+                            </div>
+                          )}
+                          {index < timelineSteps.length - 1 && (
+                            <div className={`absolute top-6 left-1/2 -translate-x-1/2 w-0.5 h-4 ${
+                              step.completed ? "bg-emerald-500/30" : "bg-border"
+                            }`} />
+                          )}
+                        </div>
+                        <span className={`text-sm ${
+                          step.completed 
+                            ? "text-foreground font-medium" 
+                            : step.inProgress 
+                              ? "text-primary font-medium" 
+                              : "text-muted-foreground"
+                        }`}>
+                          {step.label}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Deployment Status Badge */}
+                  {deploymentStatus && !loading && (
+                    <div className="mt-4 pt-4 border-t border-border/50">
+                      <div className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg border ${deploymentStatus.color}`}>
+                        <deploymentStatus.icon className="h-4 w-4" />
+                        <span className="text-sm font-medium">{deploymentStatus.label}</span>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
               </Card>
 
               {dockerBuildFailed && (
@@ -567,10 +768,23 @@ const dockerBuildFailed = logs.toLowerCase().includes("docker build failed");
                       <Sparkles className="h-5 w-5 text-secondary" />
                       AI Analysis
                     </CardTitle>
-                    <Badge variant="secondary" className="gap-1">
-                      <ListChecks className="h-3.5 w-3.5" />
-                      {analysis?.suggestions?.length ?? 0} suggestions
-                    </Badge>
+                    <div className="flex items-center gap-2">
+                      {analysis && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={downloadReport}
+                          className="h-7 px-2 text-xs gap-1.5 hover:bg-secondary/10"
+                        >
+                          <Download className="h-3.5 w-3.5" />
+                          Export
+                        </Button>
+                      )}
+                      <Badge variant="secondary" className="gap-1">
+                        <ListChecks className="h-3.5 w-3.5" />
+                        {analysis?.suggestions?.length ?? 0} suggestions
+                      </Badge>
+                    </div>
                   </div>
                   <CardDescription>
                     Actionable insights generated from sandbox execution logs
@@ -578,9 +792,15 @@ const dockerBuildFailed = logs.toLowerCase().includes("docker build failed");
                 </CardHeader>
                 <CardContent className="ui-scrollbar space-y-5 lg:h-[calc(28rem-7.25rem)] lg:overflow-y-auto pr-2">
                   {analysisLoading ? (
-                    <div className="flex items-center gap-2 rounded-lg border border-border/60 bg-muted/20 p-4 text-sm text-muted-foreground">
-                      <Spinner className="size-4" />
-                      Generating AI analysis...
+                    <div className="space-y-4">
+                      <div className="flex flex-col items-center justify-center p-6 rounded-lg border border-secondary/30 bg-gradient-to-br from-secondary/5 to-primary/5">
+                        <div className="relative mb-4">
+                          <div className="h-12 w-12 rounded-full border-2 border-secondary/30 border-t-secondary animate-spin" />
+                          <Sparkles className="h-5 w-5 text-secondary absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
+                        </div>
+                        <p className="text-sm font-medium text-foreground">Generating AI Analysis</p>
+                        <p className="text-xs text-muted-foreground mt-1">Analyzing build logs and dependencies...</p>
+                      </div>
                     </div>
                   ) : analysisError ? (
                     <Alert className="border-destructive/40 bg-destructive/5">
@@ -675,20 +895,37 @@ const dockerBuildFailed = logs.toLowerCase().includes("docker build failed");
 
         {/* Empty State */}
         {!runId && !loading && !error && (
-          <Card className="border-border/50 bg-card/30 backdrop-blur-sm text-center py-12">
-            <CardContent className="space-y-4">
+          <Card className="border-border/50 bg-card/30 backdrop-blur-sm text-center py-16">
+            <CardContent className="space-y-6">
               <div className="flex justify-center">
-                <div className="p-4 rounded-lg bg-gradient-to-br from-primary/10 to-secondary/10 border border-primary/20">
-                  <GitBranch className="h-8 w-8 text-primary/60" />
+                <div className="relative">
+                  <div className="absolute -inset-4 rounded-full bg-gradient-to-r from-primary/20 via-secondary/20 to-primary/20 blur-xl animate-pulse" />
+                  <div className="relative p-5 rounded-2xl bg-gradient-to-br from-primary/10 to-secondary/10 border border-primary/20">
+                    <FileCode className="h-10 w-10 text-primary" />
+                  </div>
                 </div>
               </div>
-              <div>
-                <p className="text-lg font-medium text-foreground/80">
-                  Ready to analyze your repository
+              <div className="space-y-2">
+                <h3 className="text-xl font-semibold text-foreground">
+                  No runs yet
+                </h3>
+                <p className="text-sm text-muted-foreground max-w-md mx-auto leading-relaxed">
+                  Run your first sandbox to analyze a repository. We&apos;ll build it in an isolated Docker container and provide AI-powered insights.
                 </p>
-                <p className="text-sm text-muted-foreground mt-2">
-                  Enter a GitHub repository URL and click Run Sandbavox to get started
-                </p>
+              </div>
+              <div className="flex flex-wrap items-center justify-center gap-4 pt-2">
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <div className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                  Secure sandbox environment
+                </div>
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <div className="h-1.5 w-1.5 rounded-full bg-blue-500" />
+                  Real-time build logs
+                </div>
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <div className="h-1.5 w-1.5 rounded-full bg-purple-500" />
+                  AI-powered analysis
+                </div>
               </div>
             </CardContent>
           </Card>
