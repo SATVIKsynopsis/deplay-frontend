@@ -79,7 +79,7 @@ function LogsDialog({ runId, repoName }: { runId: string; repoName: string }) {
     try {
       setLoading(true);
       setError(null);
-      const response = await fetch(`/api/logs/${runId}`);
+      const response = await fetch(`/api/logs-static/${runId}`);
       if (!response.ok) throw new Error("Failed to fetch logs");
       const text = await response.text();
       setLogs(text);
@@ -149,7 +149,7 @@ function AnalysisDialog({ runId, repoName, repoUrl, language, status }: { runId:
     try {
       setLoading(true);
       setError(null);
-      const response = await fetch(`/api/logs-static/${runId}`);
+      const response = await fetch(`/api/analysis/${runId}`);
       if (!response.ok) throw new Error("Failed to fetch analysis");
       const data = await response.json();
       setAnalysis(data);
