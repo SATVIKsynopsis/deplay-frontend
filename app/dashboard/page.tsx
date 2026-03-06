@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { AlertCircle, CheckCircle2, GitBranch, Zap, Code2, Terminal, Sparkles, ListChecks, User, Link as LinkIcon, Download, Clock, Circle, Loader2, Shield, ShieldAlert, ShieldX, Rocket, FileCode } from "lucide-react";
+import { AlertCircle, CheckCircle2, GitBranch, Zap, Code2, Terminal, Sparkles, ListChecks, User, Link as LinkIcon, Download, Clock, Circle, Loader2, Shield, ShieldAlert, ShieldX, Rocket, FileCode, RefreshCw } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Spinner } from "@/components/ui/spinner";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -720,13 +720,23 @@ useEffect(() => {
                     ))}
                   </div>
 
-                  {/* Deployment Status Badge */}
+                  {/* Deployment Status Badge + Run Again */}
                   {deploymentStatus && !loading && (
-                    <div className="mt-4 pt-4 border-t border-border/50">
+                    <div className="mt-4 pt-4 border-t border-border/50 flex items-center justify-between gap-3">
                       <div className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg border ${deploymentStatus.color}`}>
                         <deploymentStatus.icon className="h-4 w-4" />
                         <span className="text-sm font-medium">{deploymentStatus.label}</span>
                       </div>
+                      <Button
+                        onClick={runSandbox}
+                        disabled={loading || !repoUrl || !language}
+                        variant="outline"
+                        size="sm"
+                        className="gap-2 hover:bg-primary/10 hover:border-primary/50"
+                      >
+                        <RefreshCw className="h-4 w-4" />
+                        Run Again
+                      </Button>
                     </div>
                   )}
                 </CardContent>
