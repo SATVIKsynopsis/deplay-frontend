@@ -211,19 +211,27 @@ useEffect(() => {
 useEffect(() => {
   if (!logs) return;
 
-  setStatus("RUNNING");
+  const logsLower = logs.toLowerCase();
 
+  // Only mark as NOT_READY for actual build failures, not just any "error" word
   if (
-    logs.includes("error") || 
-    logs.includes("Error") ||
-    logs.includes("failed")
+    logsLower.includes("docker build failed") ||
+    logsLower.includes("build failed") ||
+    logsLower.includes("fatal error") ||
+    logsLower.includes("error: ") ||
+    logsLower.includes("npm err!") ||
+    logsLower.includes("pip error")
   ) {
     setStatus("NOT_READY");
+    return;
   }
 
-  if (logs.includes("Docker build finished")) {
+  if (logsLower.includes("docker build finished")) {
     setStatus("READY");
+    return;
   }
+
+  setStatus("RUNNING");
 }, [logs]);
 
 useEffect(() => {
@@ -324,62 +332,51 @@ const shortenedRunId = runId
   ? `${runId.slice(0, 8)}...${runId.slice(-4)}`
   : "-";
 const dockerBuildFailed = logs.toLowerCase().includes("docker build failed");
+const dockerBuildFinished = logs.toLowerCase().includes("docker build finished");
 
-// Timeline steps based on log events
+// Timeline steps based on log events - sequential logic
 const timelineSteps = useMemo(() => {
-  const steps = [
-    { id: 1, label: "Repository cloned", patterns: ["cloning", "cloned", "clone"], completed: false, inProgress: false },
-    { id: 2, label: "Dockerfile generated", patterns: ["dockerfile", "generating dockerfile"], completed: false, inProgress: false },
-    { id: 3, label: "Dependencies installed", patterns: ["dependencies", "installing", "npm install", "pip install", "cargo build"], completed: false, inProgress: false },
-    { id: 4, label: "Docker build completed", patterns: ["docker build finished", "build complete", "image built"], completed: false, inProgress: false },
-    { id: 5, label: "AI analysis running", patterns: ["analysis", "analyzing", "ai"], completed: false, inProgress: false },
-  ];
-
   const logsLower = logs.toLowerCase();
-  let lastCompletedIndex = -1;
+  
+  // Check each step completion in order
+  const step1Done = logsLower.includes("cloning") || logsLower.includes("cloned");
+  const step2Done = step1Done && logsLower.includes("dockerfile");
+  const step3Done = step2Done && (
+    logsLower.includes("downloaded") || 
+    logsLower.includes("installed") || 
+    logsLower.includes("compiling") ||
+    logsLower.includes("building")
+  );
+  const step4Done = step3Done && dockerBuildFinished;
+  const step5Done = step4Done && analysis !== null;
 
-  steps.forEach((step, index) => {
-    const isMatched = step.patterns.some(p => logsLower.includes(p));
-    if (isMatched) {
-      step.completed = true;
-      lastCompletedIndex = index;
-    }
-  });
+  // Determine what's currently in progress
+  const step1InProgress = loading && !step1Done;
+  const step2InProgress = loading && step1Done && !step2Done;
+  const step3InProgress = loading && step2Done && !step4Done && !dockerBuildFailed;
+  const step4InProgress = false; // Docker build shows as step 3 progress until finished
+  const step5InProgress = (status === "READY" || dockerBuildFinished) && analysisLoading && !analysis;
 
-  // Mark Docker build as completed if it finished
-  if (logsLower.includes("docker build finished")) {
-    steps[3].completed = true;
-    lastCompletedIndex = Math.max(lastCompletedIndex, 3);
-  }
+  return [
+    { id: 1, label: "Repository cloned", completed: step1Done, inProgress: step1InProgress },
+    { id: 2, label: "Dockerfile generated", completed: step2Done, inProgress: step2InProgress },
+    { id: 3, label: "Dependencies installed", completed: step3Done, inProgress: step3InProgress },
+    { id: 4, label: "Docker build completed", completed: step4Done, inProgress: step4InProgress },
+    { id: 5, label: "AI analysis", completed: step5Done, inProgress: step5InProgress },
+  ];
+}, [logs, loading, status, analysis, analysisLoading, dockerBuildFinished, dockerBuildFailed]);
 
-  // Mark AI analysis as in progress when build is done but analysis not yet complete
-  if (status === "READY" && analysisLoading) {
-    steps[4].inProgress = true;
-    steps[4].completed = false;
-  }
-
-  // Mark AI analysis as completed when we have analysis
-  if (analysis) {
-    steps[4].completed = true;
-  }
-
-  // Mark the next step as in progress if we're still loading
-  if (loading && lastCompletedIndex < steps.length - 1) {
-    const nextStep = steps[lastCompletedIndex + 1];
-    if (nextStep && !nextStep.completed) {
-      nextStep.inProgress = true;
-    }
-  }
-
-  return steps;
-}, [logs, loading, status, analysis, analysisLoading]);
-
-// Deployment status based on analysis
+// Deployment status based on analysis - only show when not loading
 const deploymentStatus = useMemo(() => {
-  if (dockerBuildFailed || status === "NOT_READY") {
+  // Don't show deployment status while still loading
+  if (loading) return null;
+  
+  // Only show failed if docker build explicitly failed
+  if (dockerBuildFailed) {
     return { status: "failed", label: "Build Failed", color: "bg-red-500/10 text-red-600 border-red-500/30", icon: ShieldX };
   }
   
+  // Only show status after we have analysis
   if (analysis) {
     const hasVulnerabilities = analysis.suggestions.some(s => 
       s.toLowerCase().includes("vulnerab") || 
@@ -402,7 +399,7 @@ const deploymentStatus = useMemo(() => {
   }
 
   return null;
-}, [analysis, dockerBuildFailed, status]);
+}, [analysis, dockerBuildFailed, loading]);
 
 // Download report function
 const downloadReport = () => {
@@ -742,7 +739,7 @@ useEffect(() => {
                 </CardContent>
               </Card>
 
-              {dockerBuildFailed && (
+              {dockerBuildFailed && !loading && (
                 <Alert className="border-destructive/50 bg-destructive/10">
                   <AlertCircle className="h-4 w-4 text-destructive" />
                   <AlertDescription className="text-destructive">
