@@ -28,6 +28,7 @@ import {
   Lightbulb,
   AlertTriangle,
   Loader2,
+  Download,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -138,7 +139,7 @@ function LogsDialog({ runId, repoName }: { runId: string; repoName: string }) {
 }
 
 // Analysis Dialog Component
-function AnalysisDialog({ runId, repoName }: { runId: string; repoName: string }) {
+function AnalysisDialog({ runId, repoName, repoUrl, language, status }: { runId: string; repoName: string; repoUrl?: string; language?: string; status?: string }) {
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -159,6 +160,34 @@ function AnalysisDialog({ runId, repoName }: { runId: string; repoName: string }
     }
   };
 
+  const downloadReport = () => {
+    if (!analysis) return;
+
+    const report = {
+      timestamp: new Date().toISOString(),
+      runId: runId,
+      repository: repoUrl || repoName,
+      repoName: repoName,
+      language: language || "Unknown",
+      status: status || "Unknown",
+      summary: analysis.summary,
+      issues: analysis.issues || [],
+      suggestions: analysis.suggestions || [],
+      totalIssues: analysis.issues?.length || 0,
+      totalSuggestions: analysis.suggestions?.length || 0,
+    };
+
+    const blob = new Blob([JSON.stringify(report, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `deplik-report-${repoName}-${new Date().toISOString().split("T")[0]}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   useEffect(() => {
     if (open) {
       fetchAnalysis();
@@ -175,9 +204,22 @@ function AnalysisDialog({ runId, repoName }: { runId: string; repoName: string }
       </DialogTrigger>
       <DialogContent className="max-w-4xl max-h-[85vh] flex flex-col">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Sparkles className="h-5 w-5 text-primary" />
-            AI Analysis Report
+          <DialogTitle className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-primary" />
+              AI Analysis Report
+            </div>
+            {analysis && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={downloadReport}
+                className="h-8 px-3 text-xs gap-1.5 hover:bg-primary/10"
+              >
+                <Download className="h-3.5 w-3.5" />
+                Export
+              </Button>
+            )}
           </DialogTitle>
           <DialogDescription>
             Analysis for {repoName} • Run ID: {runId.substring(0, 8)}...
@@ -363,7 +405,13 @@ function RunCard({ run }: { run: Run }) {
             <LogsDialog runId={run.runId} repoName={run.repoName} />
           )}
           {run.analysisS3Key && (
-            <AnalysisDialog runId={run.runId} repoName={run.repoName} />
+            <AnalysisDialog 
+              runId={run.runId} 
+              repoName={run.repoName} 
+              repoUrl={run.repoUrl}
+              language={run.language}
+              status={run.status}
+            />
           )}
           <Button
             asChild
