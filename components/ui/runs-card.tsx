@@ -142,14 +142,14 @@ function LogsDialog({ runId, repoName }: { runId: string; repoName: string }) {
 function AnalysisDialog({ runId, repoName, repoUrl, language, status }: { runId: string; repoName: string; repoUrl?: string; language?: string; status?: string }) {
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);  
   const [open, setOpen] = useState(false);
 
   const fetchAnalysis = async () => {
     try {
       setLoading(true);
       setError(null);
-      const response = await fetch(`/api/analysis/${runId}`);
+      const response = await fetch(`/api/logs-static/${runId}`);
       if (!response.ok) throw new Error("Failed to fetch analysis");
       const data = await response.json();
       setAnalysis(data);
