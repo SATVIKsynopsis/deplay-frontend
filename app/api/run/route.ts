@@ -3,11 +3,11 @@ import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(req: NextRequest) {
   const cookieStore = await cookies();
-  const session = cookieStore.get("session")?.value; // ✅ read session
+  const session = cookieStore.get("session")?.value; 
 
   const body = await req.json();
 
-  const backendRes = await fetch("https://7hhu2l3cw4.execute-api.ap-south-1.amazonaws.com/run", {
+  const backendRes = await fetch("http://3.111.147.73:8080/run", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
