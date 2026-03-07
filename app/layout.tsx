@@ -7,7 +7,7 @@ const _geist = Geist({ subsets: ["latin"] });
 const _geistMono = Geist_Mono({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: 'Deplik - Pre-Deployment Sandbox',
+  title: 'Deplay - Pre-Deployment Sandbox',
   description: 'Test your repository before it goes live',
   generator: 'v0.app',
   icons: {
