@@ -7,7 +7,7 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json();
 
-  const backendRes = await fetch("http://3.111.147.73:8080/run", {
+  const backendRes = await fetch("https://7hhu2l3cw4.execute-api.ap-south-1.amazonaws.com/run", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

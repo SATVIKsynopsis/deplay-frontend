@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
       headers["Cookie"] = `session=${sessionCookie}`;
     }
 
-    const backendUrl = "http://3.111.147.73:8080/runs";
+    const backendUrl = "https://7hhu2l3cw4.execute-api.ap-south-1.amazonaws.com/runs";
     console.log("Fetching from:", backendUrl);
     
     const backendRes = await fetch(backendUrl, {

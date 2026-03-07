@@ -26,7 +26,7 @@ export default function Landing() {
             <a href="#how" className="text-sm text-muted-foreground hover:text-foreground transition">How it works</a>
             <a href="#benefits" className="text-sm text-muted-foreground hover:text-foreground transition">Benefits</a>
           </div>
-          <a href="http://3.111.147.73:8080/auth/github">
+          <a href="https://7hhu2l3cw4.execute-api.ap-south-1.amazonaws.com/auth/github">
             <Button size="sm" className="gap-2">
               Launch App <ArrowRight className="w-4 h-4" />
             </Button>
@@ -53,7 +53,7 @@ export default function Landing() {
             </div>
 
             <div className="flex flex-col sm:flex-row gap-4 pt-4">
-              <a href="http://3.111.147.73:8080/auth/github">
+              <a href="https://7hhu2l3cw4.execute-api.ap-south-1.amazonaws.com/auth/github">
                 <Button size="lg" className="w-full sm:w-auto">
                   Get Started <ArrowRight className="w-5 h-5 ml-2" />
                 </Button>

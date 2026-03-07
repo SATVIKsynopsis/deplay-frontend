@@ -78,7 +78,7 @@ export default function ProfilePage() {
 
         if (!res.ok) {
           if (res.status === 401) {
-            window.location.href = "http://3.111.147.73:8080/auth/github";
+            window.location.href = "https://7hhu2l3cw4.execute-api.ap-south-1.amazonaws.com/auth/github";
             return;
           }
           throw new Error("Failed to fetch user data");
@@ -97,7 +97,7 @@ export default function ProfilePage() {
   }, []);
 
   const handleLogout = () => {
-    window.location.href = "http://3.111.147.73:8080/logout";
+    window.location.href = "https://7hhu2l3cw4.execute-api.ap-south-1.amazonaws.com/logout";
   };
 
   const formatDate = (dateString: string) => {

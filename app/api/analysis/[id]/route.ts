@@ -9,7 +9,7 @@ export async function GET(
   const { id } = await params;
 
   const backendRes = await fetch(
-    `http://3.111.147.73:8080/analysis/${id}`,
+    `https://7hhu2l3cw4.execute-api.ap-south-1.amazonaws.com/analysis/${id}`,
     {
       cache: "no-store",
     }
