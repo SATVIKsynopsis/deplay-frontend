@@ -369,12 +369,6 @@ Built with ❤️ for the hackathon by passionate developers who believe deploym
 
 ---
 
-## 📄 License
-
-MIT License — feel free to use this project for your own deployments!
-
----
-
 <p align="center">
   <strong>⚡ Deplay — Because shipping broken code isn't an option.</strong>
 </p>
