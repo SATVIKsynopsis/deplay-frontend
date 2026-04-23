@@ -11,7 +11,7 @@ const nextConfig = {
     return [
       {
         source: '/auth/:path*',
-        destination: 'http://3.111.147.73:8080/auth/:path*',
+        destination: 'http://13.206.147.84:8080/auth/:path*',
       },
     ];
   },
