@@ -9,7 +9,7 @@ export async function GET(
   const { id } = await params;
 
   const backendRes = await fetch(
-    `http://3.111.147.73:8080/logs/${id}`,
+    `http://13.206.147.84:8080/logs/${id}`,
     {
       headers: {
         Accept: "text/event-stream",
